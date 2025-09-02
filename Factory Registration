@@ -1,0 +1,68 @@
+class base_drv extends uvm_driver#(my_item);
+  `uvm_component_utils(base_drv)
+  function new(string n, uvm_component p); super.new(n,p); endfunction
+endclass
+
+class cov_drv extends base_drv; // alternative impl (e.g., adds coverage/checks)
+  `uvm_component_utils(cov_drv)
+  function new(string n, uvm_component p); super.new(n,p); endfunction
+endclass
+
+class my_agent extends uvm_agent;
+  `uvm_component_utils(my_agent)
+  base_drv drv;  // declared as base
+  function new(string n, uvm_component p); super.new(n,p); endfunction
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    drv = base_drv::type_id::create("drv", this); // FACTORY create
+  endfunction
+endclass
+
+=================Type Override=======================================
+class type_override_test extends uvm_test;
+  `uvm_component_utils(type_override_test)
+  my_env env;
+
+  function new(string n, uvm_component p); super.new(n,p); endfunction
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    // Swap every base_drv with cov_drv globally
+    uvm_factory::get().set_type_override_by_type(
+      base_drv::get_type(), cov_drv::get_type()
+    );
+    env = my_env::type_id::create("env", this);
+    // Optional: see active overrides
+    // uvm_factory::get().print();
+  endfunction
+endclass
+==========================Inst Override=========================================
+class inst_override_test extends uvm_test;
+  `uvm_component_utils(inst_override_test)
+  my_env env;
+
+  function new(string n, uvm_component p); super.new(n,p); endfunction
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    // Only replace the driver at this exact path:
+    uvm_factory::get().set_inst_override_by_type(
+      base_drv::get_type(), cov_drv::get_type(),
+      "uvm_test_top.env.agtA.drv"   // path to the target instance
+    );
+    env = my_env::type_id::create("env", this);
+  endfunction
+endclass
+--------------------------------------------------------------------------------------------
+both components and objects support two kinds of overrides:
+
+Type override: swap every instance of a type everywhere.
+
+Instance override: swap only at a specific hierarchical path.
+========================================================================================
+The agent still asks for base_drv via the factory.
+
+The test tells the factory: “when someone asks for base_drv, give errinj_drv instead.”
+
+The agent code doesn’t change; only the created implementation changes per test.
