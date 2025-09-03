@@ -1,3 +1,6 @@
+-> router_driver::type_id::set_type_override(router_bypass_driver::get_type());
+
+------------------------------------------------------------
 class base_drv extends uvm_driver#(my_item);
   `uvm_component_utils(base_drv)
   function new(string n, uvm_component p); super.new(n,p); endfunction
