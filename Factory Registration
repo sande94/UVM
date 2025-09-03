@@ -66,3 +66,34 @@ The agent still asks for base_drv via the factory.
 The test tells the factory: “when someone asks for base_drv, give errinj_drv instead.”
 
 The agent code doesn’t change; only the created implementation changes per test.
+------------------------------------------------------------------------------------------------------------------------------------------------------
+class base_drv extends uvm_driver#(my_item);
+  `uvm_component_utils(base_drv)
+  function new(string n, uvm_component p); super.new(n,p); endfunction
+  virtual task run_phase(uvm_phase phase);
+    `uvm_info("DRV","base_drv running",UVM_LOW)
+  endtask
+endclass
+
+class cov_drv extends base_drv;
+  `uvm_component_utils(cov_drv)
+  function new(string n, uvm_component p); super.new(n,p); endfunction
+  virtual task run_phase(uvm_phase phase);
+    `uvm_info("DRV","cov_drv (override) running",UVM_LOW)
+  endtask
+endclass
+
+class my_agent extends uvm_agent;
+  `uvm_component_utils(my_agent)
+  base_drv drv; // base handle
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    drv = base_drv::type_id::create("drv", this); // factory create
+  endfunction
+endclass
+
+// In the TEST (policy), before creation:
+uvm_factory::get().set_type_override_by_type(base_drv::get_type(), cov_drv::get_type());
+
+// Result: my_agent still asks for base_drv, but factory returns a cov_drv.
+// drv's static type is base_drv; its dynamic type is cov_drv; virtuals call cov_drv.
