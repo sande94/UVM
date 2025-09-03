@@ -1,3 +1,19 @@
+Methods of type override in UVM factory
+set_type_override_by_type
+set_type_override_by_name
+
+
+1)    set_type_override_by_type(component_A::get_type(), component_B::get_type());
+2)    factory.set_type_override_by_name("component_A", "component_B");
+
+Methods of instance override in UVM factory
+set_inst_override_by_type
+set_inst_override_by_name
+
+1)    set_inst_override_by_type("*", component_A::get_type(), component_B::get_type());
+2)     factory.set_inst_override_by_name("component_A", "component_B", "*");
+
+
 -> router_driver::type_id::set_type_override(router_bypass_driver::get_type());
 
 ------------------------------------------------------------
