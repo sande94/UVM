@@ -1,0 +1,145 @@
+What a class gives you
+
+Encapsulation: variables + methods in one unit.
+
+Dynamic allocation: objects live on the heap; you access them via handles.
+
+Inheritance & polymorphism: build families of related classes and override behavior.
+
+Randomization support: rand fields + constraint blocks for stimulus.
+
+----------------------------------------------------------------------------------------------
+Handles vs objects (important!)
+
+Packet p; creates a null handle (no object yet).
+
+p = new; actually allocates the object.
+
+Assignment copies handles, not objects:
+
+---------------------------------------------------------------------------------------------------
+Packet p;   // p is a null handle (no object allocated)
+----------------------------------------constructor-------------------------------------------------------
+class Packet;
+  bit [31:0] addr;
+  bit        write;
+
+  // Constructor
+  function new(bit w = 0, bit [31:0] a = 0);
+    write = w;     // initialize 'write'
+    addr  = a;     // initialize 'addr'
+  endfunction
+endclass
+
+// Using constructor
+initial begin
+  Packet p1 = new();                  // addr=0, write=0
+  Packet p2 = new(1, 32'hABCD);       // addr=ABCD, write=1
+end
+Always called new.
+
+Runs once at object creation.
+
+Can take arguments (like parameters in p2 = new(1, 32'hABCD);).
+
+If you don’t define one, SystemVerilog provides a default constructor (new() with no arguments).
+
+Commonly used in UVM to pass a name + parent component:
+
+-----------------------task --------------------------------------------------------------
+                         class MathUtil;
+  // Task: computes sum and product after a delay
+  task automatic sum_prod(input int a, input int b,
+                          output int sum, output int prod);
+    #5;            // tasks can consume time
+    sum  = a + b;  // drive outputs
+    prod = a * b;
+  endtask
+endclass
+
+module top;
+  initial begin
+    MathUtil m = new();
+    int s, p;
+    m.sum_prod(3, 4, s, p);   // call: outputs are assigned inside the task
+    $display("sum=%0d prod=%0d @%0t", s, p, $time);
+  end
+endmodule
+
+====================================super.new()=====================================================
+                         
+               How UVM builds the tree
+
+Root: UVM has a singleton root uvm_top (a uvm_root). Your test (e.g. uvm_test_top) is created under it.
+
+Constructor stores the relationship: When you do super.new(name, parent), UVM:
+
+Stores a handle to the parent inside the child.
+
+Computes the child’s full path = parent.get_full_name() + "." + name (root name for top).
+
+Registers the child in the parent’s internal children list.
+
+Factory create wires it up: type_id::create("child_name", parent) calls the child’s new("child_name", parent) under the hood, so the linkage is consistent.
+
+Traversal/printing: uvm_top.print_topology() walks that parent→children structure to show the hierarchy.
+                         class my_driver  extends uvm_driver#(uvm_sequence_item);
+  `uvm_component_utils(my_driver)
+  function new(string name="drv", uvm_component parent=null);
+    super.new(name, parent); // attach to parent, compute full name
+  endfunction
+endclass
+
+class my_agent   extends uvm_agent;
+  `uvm_component_utils(my_agent)
+  my_driver drv;
+  function new(string name="agt", uvm_component parent=null);
+    super.new(name, parent);
+  endfunction
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    drv = my_driver::type_id::create("drv", this); // parent = this agent
+  endfunction
+endclass
+
+class my_env     extends uvm_env;
+  `uvm_component_utils(my_env)
+  my_agent agt;
+  function new(string name="env", uvm_component parent=null);
+    super.new(name, parent);
+  endfunction
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    agt = my_agent::type_id::create("agt", this);  // parent = this env
+  endfunction
+endclass
+
+class my_test    extends uvm_test;
+  `uvm_component_utils(my_test)
+  my_env env;
+  function new(string name="my_test", uvm_component parent=null);
+    super.new(name, parent);                         // parent = uvm_test_top
+  endfunction
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    env = my_env::type_id::create("env", this);     // parent = this test
+  endfunction
+  function void end_of_elaboration_phase(uvm_phase phase);
+    uvm_top.print_topology();
+    `uvm_info("PATHS",
+      $sformatf("test: %s\nenv: %s\nagt: %s\ndrv: %s",
+        get_full_name(),
+        env.get_full_name(),
+        env.agt.get_full_name(),
+        env.agt.drv.get_full_name()),
+      UVM_LOW)
+  endfunction
+endclass
+
+module top; initial run_test("my_test"); endmodule
+
+                         uvm_test_top (my_test)
+  env        (my_env)
+    agt      (my_agent)
+      drv    (my_driver)
+
