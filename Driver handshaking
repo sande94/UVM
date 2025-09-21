@@ -1,0 +1,4 @@
+So the normal lifecycle is: start_item (wait for grant) → finish_item (send) → driver get_next_item (drive) → driver item_done() (sequence can issue next item)
+→ optional driver put_response() ↔ sequence get_response().
+seq_item_port.get_next_item(req) returns a handle to the exact sequence item object that the sequence passed to start_item()/finish_item()—not a copy.
+It arrives after the sequencer arbitrates, so the call blocks until an item is available; the sequence is then blocked until you call item_done().
