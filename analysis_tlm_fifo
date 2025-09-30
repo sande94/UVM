@@ -1,0 +1,36 @@
+Re using of id :
+
+// monitor reconstructs and publishes observed ID
+class my_monitor extends uvm_monitor;
+  uvm_analysis_port #(my_item) ap;
+  // ...
+  task run_phase(uvm_phase phase);
+    forever begin
+      @(posedge vif.clk);
+      my_item tr = my_item::type_id::create("tr");
+      tr.id  = vif.id;  // observed from DUT bus
+      tr.data= vif.data;
+      ap.write(tr);
+    end
+  endtask
+endclass
+
+// env wires monitor → fifo
+mon2seq_fifo = new("mon2seq_fifo", this);
+agent.mon.ap.connect(mon2seq_fifo.analysis_export);
+
+// sequence pulls and reuses the id
+class reactive_seq extends uvm_sequence #(my_item);
+  uvm_analysis_fifo #(my_item) mon_fifo;
+
+  task body();
+    my_item rsp, req;
+
+    // wait for an observed item from monitor
+    mon_fifo.get(rsp);            // blocks till monitor publishes
+    req = my_item::type_id::create("req");
+    req.id = rsp.id;              // ← reuse ID
+    // fill other fields...
+    start_item(req); finish_item(req);
+  endtask
+endclass
